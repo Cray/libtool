@@ -5175,7 +5175,7 @@ func_mode_link ()
 	;;
 
       -mt|-mthreads|-kthread|-Kthread|-pthread|-pthreads|--thread-safe \
-      |-threads|-fopenmp|-openmp|-mp|-xopenmp|-omp|-qsmp=*)
+      |-threads|-fopenmp|-openmp|-mp|-xopenmp|-omp|-qsmp=*|-h*omp)
 	func_append compiler_flags " $arg"
 	func_append compile_command " $arg"
 	func_append finalize_command " $arg"
@@ -5713,7 +5713,7 @@ func_mode_link ()
 	found=false
 	case $deplib in
 	-mt|-mthreads|-kthread|-Kthread|-pthread|-pthreads|--thread-safe \
-        |-threads|-fopenmp|-openmp|-mp|-xopenmp|-omp|-qsmp=*)
+        |-threads|-fopenmp|-openmp|-mp|-xopenmp|-omp|-qsmp=*|-h*omp)
 	  if test prog,link = "$linkmode,$pass"; then
 	    compile_deplibs="$deplib $compile_deplibs"
 	    finalize_deplibs="$deplib $finalize_deplibs"
@@ -6253,6 +6253,21 @@ func_mode_link ()
 	    ;;
 	  esac
 	  # This is a shared library
+
+	  # Cray's compiler drivers need a -dynamic flag if any linked
+	  # library is a shared library.  Ensure it gets this flag.
+	  case `$CC -V 2>&1 | sed 5q` in
+	      *Cray*)
+		  case " $compile_command " in
+		      *" -dynamic ") ;;
+		      *) func_append compile_command " -dynamic" ;;
+		  esac
+		  case " $finalize_command " in
+		      *" -dynamic ") ;;
+		      *) func_append finalize_command " -dynamic" ;;
+		  esac
+		  ;;
+	  esac
 
 	  # Warn about portability, can't link against -module's on some
 	  # systems (darwin).  Don't bleat about dlopened modules though!
@@ -8331,7 +8346,24 @@ EOF
 	finalize_deplibs=`$ECHO " $finalize_deplibs" | $SED 's% \([^ $]*\).ltframework% -framework \1%g'`
 	;;
       esac
-
+      if test -n "$dlfiles" ||
+	 test "$dlself" = "yes" ||
+	 test "$export_dynamic" = "yes"; then
+	# Cray's compiler drivers need a -dynamic flag if the program
+	# is going to be dlopening itself or any libraries.
+	case `$CC -V 2>&1 | sed 5q` in
+	    *Cray*)
+		case " $compile_command " in
+		    *" -dynamic ") ;;
+		    *) func_append compile_command " -dynamic" ;;
+		esac
+		case " $finalize_command " in
+		    *" -dynamic ") ;;
+		    *) func_append finalize_command " -dynamic" ;;
+		esac
+		;;
+	esac
+      fi
 
       # move library search paths that coincide with paths to not yet
       # installed libraries to the beginning of the library search list
